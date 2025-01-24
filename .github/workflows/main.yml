@@ -125,7 +125,7 @@ jobs:
         run: node -v
 
       - name: Pull Vercel Environment Information
-        working-directory: apps/frontend
+        working-directory: apps/web
         run: pnpm vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build
@@ -171,11 +171,11 @@ jobs:
         run: pnpm turbo run vercel-gha-build --filter=frontend
 
       - name: Cp n
-        run: cp -a apps/frontend/.next/. .next/
+        run: cp -a apps/web/.next/. .next/
 
       - name: Cp v
-        run: cp -a apps/frontend/.vercel/. .vercel/
+        run: cp -a apps/web/.vercel/. .vercel/
 
       - name: Deploy Project Artifacts to Vercel
-        working-directory: apps/frontend
+        working-directory: apps/web
         run: pnpm vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
