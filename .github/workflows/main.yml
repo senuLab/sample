@@ -35,7 +35,6 @@ jobs:
     name: Detect Affected Apps
     runs-on: ubuntu-latest
     outputs:
-      is_backend_changed: ${{ steps.ex5.outputs.is_backend_changed }}
       is_frontend_changed: ${{ steps.ex5.outputs.is_frontend_changed }}
     steps:
       - name: Checkout code
@@ -129,7 +128,7 @@ jobs:
         run: pnpm vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build
-        run: pnpm turbo run vercel-gha-build --filter=frontend
+        run: pnpm turbo run vercel-gha-build --filter=web
 
 
   # 4. Next.jsのデプロイ (Vercel)
@@ -168,7 +167,7 @@ jobs:
         run: pnpm vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build
-        run: pnpm turbo run vercel-gha-build --filter=frontend
+        run: pnpm turbo run vercel-gha-build --filter=web
 
       - name: Cp n
         run: cp -a apps/web/.next/. .next/
