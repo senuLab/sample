@@ -1,10 +1,5 @@
 name: CI/CD Workflow
 
-# env:
-#   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-#   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-
 on:
   push:
     branches:
@@ -39,9 +34,6 @@ jobs:
     needs: extract-versions
     name: Detect Affected Apps
     runs-on: ubuntu-latest
-    # env:
-    #   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-    #   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     outputs:
       is_backend_changed: ${{ steps.ex5.outputs.is_backend_changed }}
       is_frontend_changed: ${{ steps.ex5.outputs.is_frontend_changed }}
@@ -80,69 +72,25 @@ jobs:
       - name: Prune unnecessary packages
         run: pnpm prune
 
-      # lint,formatチェック（turboのキャッシュを使う）
-      # - name: Lint and Format changes
-      #   run: pnpm turbo run check
-      #   # run: turbo run check --filter=...[HEAD^]
-
-      # type checkを実行（turboのキャッシュを使う）
-      # - name: Type check
-      #   run: pnpm turbo run type-check
-        # run: turbo run type-check --filter=...[HEAD^]
-
-      # type checkを実行（turboのキャッシュを使う）
-      # - name: Test
-      #   run: pnpm turbo run test
-
       # buildが必要なappを特定（turboのキャッシュを使う）
       - name: Run Turbo dry-run
         id: ex5
         run: |
           pnpm turbo run build --dry-run=json > turbo-dry-run.json
-          BACKEND_CACHE_STATUS=$(cat turbo-dry-run.json | jq '.tasks[] | select(.package == "backend")' | jq -r '.cache.status')
           FRONTEND_CACHE_STATUS=$(cat turbo-dry-run.json | jq '.tasks[] | select(.package == "frontend")' | jq -r '.cache.status')
-          if [ $BACKEND_CACHE_STATUS = "HIT" ]; then
-            echo "is_backend_changed=false" >> $GITHUB_OUTPUT 
-          else
-            echo "is_backend_changed=true" >> $GITHUB_OUTPUT 
-          fi
           if [ $FRONTEND_CACHE_STATUS = "HIT" ]; then
             echo "is_frontend_changed=false" >> $GITHUB_OUTPUT 
           else
             echo "is_frontend_changed=true" >> $GITHUB_OUTPUT 
           fi
-          echo $BACKEND_CACHE_STATUS
           echo $FRONTEND_CACHE_STATUS
-          cat turbo-dry-run.json
-
-      # - name: Set Backend Output
-      #   id: set_backend_output
-      #   run: echo "is_backend_changed=${{ env.is_backend_changed }}" >> $GITHUB_OUTPUT 
-
-      # - name: Set Frontend Output
-      #   id: set_frontend_output
-      #   run: echo "is_frontend_changed=${{ env.is_frontend_changed }}" >> $GITHUB_OUTPUT 
-
-
-  # test-buil:
-  #   name: Test and Build Next.js App
-  #   runs-on: ubuntu-latest
-  #   needs: turbo
-  #   steps:
-  #     - name: Debug Outputs
-  #       run: |
-  #         echo "is_backend_changed: ${{ needs.turbo.outputs.is_backend_changed }}"
-  #         echo "is_frontend_changed: ${{ needs.turbo.outputs.is_frontend_changed }}"
 
 
   # 2. Next.jsのテストとビルド
-  test-build-next:
+  build-next:
     if: ${{ needs.turbo.outputs.is_frontend_changed == 'true' }}
     name: Test and Build Next.js App
     runs-on: ubuntu-latest
-    # env:
-    #   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-    #   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     needs: [extract-versions, turbo]
     steps:
       - name: env
@@ -176,140 +124,19 @@ jobs:
       - name: Prune unnecessary packages
         run: node -v
 
-  #     - name: Prune unnecessary packages
-  #       run: pnpm prune
-
-  #     - name: Run tests
-  #       run: pnpm turbo run test --filter=frontend
-      # - name: Install Vercel CLI
-      #   run: pnpm install -g vercel@latest
-
       - name: Pull Vercel Environment Information
         working-directory: apps/frontend
         run: pnpm vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        # run: pnpm dlx vercel pull --yes --environment=production
-
-      # - name: Build Project Artifacts
-      #   run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build
         run: pnpm turbo run vercel-gha-build --filter=frontend
 
-
-
-  # 3. Expressのテストとビルド
-  test-build-express:
-    if: ${{ needs.turbo.outputs.is_backend_changed == 'true' }}
-    name: Test and Build Express App
-    runs-on: ubuntu-latest
-    # env: 
-    #   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-    #   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-    needs: [extract-versions, turbo]
-    steps:
-      - name: env
-        run: echo ${{ needs.turbo.outputs.is_backend_changed }}
-
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ needs.extract-versions.outputs.pnpm_version }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ needs.extract-versions.outputs.node_version }}
-          cache: pnpm
-  
-      - name: Cache turbo build setup
-        uses: actions/cache@v4
-        with: 
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Prune unnecessary packages
-        run: pnpm prune
-
-  #     # - name: Run tests
-  #     #   run: pnpm turbo run test --filter=backend
-
-      - name: Build Express app
-        run: pnpm turbo build --filter=backend
-
-  #     - name: Prune app
-  #       run: pnpm turbo prune backend --docker
-
-  #     - name: Set up Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
-
-  #     - name: Restore Docker Cache
-  #       uses: actions/cache@v3
-  #       with:
-  #         path: /tmp/.buildx-cache
-  #         key: ${{ runner.os }}-docker-${{ github.sha }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-docker-
-
-  #     - name: Build Docker Image
-  #       run: |
-  #         docker buildx build \
-  #           --tag senuweb/apps:backend-latest \
-  #           --file ./out/full/apps/backend/DockerFile \
-  #           --cache-from type=local,src=/tmp/.buildx-cache \
-  #           --cache-to type=local,dest=/tmp/.buildx-cache,mode=max \
-  #           --load \
-  #           ./out
-
-      # - name: Check images
-      #   run: docker images
-
-      # 脆弱性チェック
-      # - name: Scan image with Trivy
-      #   uses: aquasecurity/trivy-action@master
-      #   with:
-      #     image-ref: senuweb/apps:backend-latest
-      #     format: "table"
-      #     severity: "CRITICAL,HIGH"
-      #     # exit-code: 1
-      #   env:
-      #     DOCKER_HOST: unix:///var/run/docker.sock
-
-      # - name: Check Docker best practices with Dockle
-      #   uses: erzz/dockle-action@v1
-      #   with:
-      #     image: senuweb/apps:backend-latest
-      #     failure-threshold: fatal
-      #     # exit-code: 1
-      #   env:
-      #     DOCKER_HOST: unix:///var/run/docker.sock
-
-      # - name: Log in to Docker Hub
-      #   if: github.event_name == 'push'
-      #   uses: docker/login-action@v2
-      #   with:
-      #     username: ${{ secrets.DOCKER_HUB_USERNAME }}
-      #     password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # - name: Push Docker Image
-      #   if: github.event_name == 'push'
-      #   run: docker push senuweb/apps:backend-latest
 
   # 4. Next.jsのデプロイ (Vercel)
   deploy-next:
     if: github.event_name == 'push'
     name: Deploy Next.js App to Vercel
     runs-on: ubuntu-latest
-    # env:
-    #   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-    #   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
     needs: [extract-versions, test-build-next]
     steps:
       - name: Checkout code
@@ -337,24 +164,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # - name: Install Vercel CLI
-      #   run: pnpm install -g vercel@latest
-
       - name: Pull Vercel Environment Information
         run: pnpm vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        # run: pnpm dlx vercel pull --yes --environment=production
 
       - name: Build
         run: pnpm turbo run vercel-gha-build --filter=frontend
-
-      # - name: Build Project Artifacts
-      #   run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      # - name: Ls
-      #   run: ls -al apps/frontend/.vercel
-
-      # - name: Ls
-      #   run: ls -al apps/frontend/.next
 
       - name: Cp n
         run: cp -a apps/frontend/.next/. .next/
@@ -362,28 +176,6 @@ jobs:
       - name: Cp v
         run: cp -a apps/frontend/.vercel/. .vercel/
 
-      # - name: Ls
-      #   run: ls -al
-
-      # - name: Ls
-      #   run: ls -al .vercel
-
-      # - name: Ls
-      #   run: ls -al .next
-
       - name: Deploy Project Artifacts to Vercel
-        #working-directory: apps/frontend
+        working-directory: apps/frontend
         run: pnpm vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        # run: pnpm dlx vercel deploy --prebuilt --prod
-        # run: pnpm dlx vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-
-  # 5. Expressのデプロイ (EC2)
-  # deploy-express:
-  #   if: github.event_name == 'push'
-  #   name: Deploy Express App to EC2
-  #   runs-on: ubuntu-latest
-  #   needs: [test-build-express]
-  #   steps:
-  #     - name: Deploy
-  #       run: curl ${{ secrets.DEPLOY_HOOK }}
