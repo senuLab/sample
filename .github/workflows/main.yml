@@ -164,16 +164,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Pull Vercel Environment Information
+        working-directory: apps/web
         run: pnpm vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build
         run: pnpm turbo run vercel-gha-build --filter=web
 
-      - name: Cp n
-        run: cp -a apps/web/.next/. .next/
+      # - name: Cp n
+      #   run: cp -a apps/web/.next/. .next/
 
-      - name: Cp v
-        run: cp -a apps/web/.vercel/. .vercel/
+      # - name: Cp v
+      #   run: cp -a apps/web/.vercel/. .vercel/
 
       - name: Deploy Project Artifacts to Vercel
         working-directory: apps/web
