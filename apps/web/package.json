@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint --max-warnings 0",
     "check-types": "tsc --noEmit",
-    "vercel-gha-build": "pnpm vercel build --yes --prod"
+    "vercel-gha-build": "pnpm vercel build --prod"
   },
   "dependencies": {
     "@repo/ui": "workspace:*",
